@@ -1,0 +1,250 @@
+/* NIOS Result Watcher
+   Idea: a marksheet on cool grey paper. While waiting, the status is a faded
+   blue rubber stamp. When the result lands, the whole screen turns marigold and
+   "RESULT DECLARED" is stamped on it. */
+
+:root {
+  --paper: #EEF1F6;
+  --ink: #1B2A41;
+  --stamp: #2F55A4;
+  --marigold: #FFB400;
+  --brick: #B3412E;
+  --line: #C9D1DF;
+  --muted: #566277;
+  --serif: "Noto Serif", Georgia, "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  transition: background-color .4s ease;
+}
+
+body.is-found { background: var(--marigold); }
+body.is-found .link-btn { color: var(--ink); }
+
+.shell {
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: max(1rem, env(safe-area-inset-top)) 1.25rem max(2rem, env(safe-area-inset-bottom));
+}
+
+[hidden] { display: none !important; }
+
+/* ---------------------------------------------------------------- header -- */
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3rem;
+}
+
+.top h1 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+}
+
+.link-btn {
+  background: none;
+  border: 0;
+  padding: .5rem 0;
+  color: var(--stamp);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ----------------------------------------------------------------- stamp -- */
+.stamp {
+  position: relative;
+  width: 15rem;
+  height: 15rem;
+  margin: 1.5rem auto 1.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--stamp);
+  border: 5px solid var(--stamp);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 9px var(--paper), inset 0 0 0 11px var(--stamp);
+  transform: rotate(-7deg);
+  opacity: .92;
+}
+
+.stamp-main {
+  max-width: 9rem;
+  font-family: var(--serif);
+  font-size: 1.85rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.stamp-sub {
+  margin-top: .5rem;
+  font-size: .875rem;
+  font-weight: 600;
+}
+
+.lead {
+  margin: 0 0 1.25rem;
+  max-width: 34ch;
+  font-size: 1rem;
+}
+
+/* ----------------------------------------------------------------- facts -- */
+.facts { margin: 0; }
+
+.fact {
+  padding: .75rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.fact dt { color: var(--muted); font-size: .9375rem; }
+.fact dd { margin: .125rem 0 0; font-weight: 600; }
+
+.warning {
+  margin: 0 0 .25rem;
+  padding: .75rem .875rem;
+  border-left: 4px solid var(--brick);
+  background: #F6E3DF;
+  color: #5E1F14;
+  font-size: .9375rem;
+}
+
+/* ------------------------------------------------------------------ rows -- */
+.rows {
+  list-style: none;
+  margin: .5rem 0 1.5rem;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .875rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.row-title { margin: 0; font-weight: 600; }
+.row-note { margin: .125rem 0 0; color: var(--muted); font-size: .9375rem; }
+
+/* --------------------------------------------------------------- buttons -- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+  padding: .625rem 1.25rem;
+  border: 2px solid var(--ink);
+  border-radius: .5rem;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: default; }
+
+.btn.primary { background: var(--ink); color: var(--paper); }
+
+.btn.small { min-height: 2.5rem; padding: .375rem 1rem; flex: none; }
+
+.btn.toggle[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+.actions { display: grid; gap: .75rem; }
+
+.btn:focus-visible,
+.link-btn:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--stamp);
+  outline-offset: 3px;
+}
+
+/* ----------------------------------------------------------------- found -- */
+.found {
+  text-align: center;
+  padding-top: 1.5rem;
+  overflow-x: clip;   /* the stamp-in animation must never widen the page on phones */
+}
+
+.found-emoji {
+  margin: 0;
+  font-size: 5.5rem;
+  line-height: 1;
+}
+
+.found-title {
+  margin: 1rem 0 1.25rem;
+  font-family: var(--serif);
+  font-size: clamp(2.25rem, 11vw, 3.25rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: .01em;
+  animation: stamp-in .55s cubic-bezier(.2, .9, .3, 1.2) both;
+}
+
+@keyframes stamp-in {
+  from { transform: scale(1.4) rotate(-9deg); opacity: 0; }
+  60%  { opacity: 1; }
+  to   { transform: scale(1) rotate(-3deg); opacity: 1; }
+}
+
+.found-text {
+  margin: 0 0 .5rem;
+  padding: 1rem;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: .5rem;
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.found-time { margin: 0 0 1.5rem; font-size: .9375rem; }
+.found-hint { margin: 0 0 1rem; font-weight: 700; }
+
+.found .btn { width: 100%; margin-bottom: .75rem; }
+.found .btn.stop { background: var(--brick); border-color: var(--brick); color: #fff; min-height: 3.75rem; font-size: 1.25rem; }
+.found .btn.open { background: var(--ink); color: var(--paper); }
+
+/* ----------------------------------------------------------------- toast -- */
+.msg {
+  min-height: 1.5rem;
+  margin: 1.25rem 0 0;
+  font-size: .9375rem;
+  font-weight: 600;
+  color: var(--stamp);
+}
+.msg.error { color: var(--brick); }
+body.is-found .msg { color: var(--ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>NIOS Result Watcher</title>
+  <meta name="description" content="Watches results.nios.ac.in every day and alerts you when the result is declared.">
+  <meta name="theme-color" content="#1B2A41">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="NIOS Watch">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="top">
+      <h1>NIOS Result Watcher</h1>
+      <button id="installBtn" class="link-btn" type="button" hidden>Install app</button>
+    </header>
+
+    <!-- Shown while the result has not been declared -->
+    <section id="waitingView" aria-live="polite">
+      <div class="stamp" id="stamp">
+        <span class="stamp-main">Not declared yet</span>
+        <span class="stamp-sub">checked every day</span>
+      </div>
+
+      <p class="lead">
+        Looking for an announcement that mentions
+        <strong>ODE</strong>, <strong>16 to 31 Aug 2026</strong>,
+        <strong>Secondary</strong> and <strong>April 2026 Session</strong> together.
+      </p>
+
+      <dl class="facts">
+        <div class="fact">
+          <dt>Last checked</dt>
+          <dd id="lastChecked">Loading…</dd>
+        </div>
+      </dl>
+      <p id="checkWarning" class="warning" role="status" hidden></p>
+
+      <ul class="rows">
+        <li class="row">
+          <div>
+            <p class="row-title">Phone alerts</p>
+            <p class="row-note" id="pushNote">Get a notification even when this app is closed.</p>
+          </div>
+          <button id="pushBtn" class="btn small" type="button">Turn on</button>
+        </li>
+        <li class="row">
+          <div>
+            <p class="row-title">Alarm sound</p>
+            <p class="row-note">Rings until you stop it, while this app is open.</p>
+          </div>
+          <button id="alarmBtn" class="btn small toggle" type="button" aria-pressed="true">On</button>
+        </li>
+      </ul>
+
+      <div class="actions">
+        <button id="checkBtn" class="btn primary" type="button">Check now</button>
+        <button id="testBtn" class="btn" type="button">Send test notification</button>
+      </div>
+    </section>
+
+    <!-- Shown once the result is found -->
+    <section id="foundView" class="found" hidden aria-live="assertive">
+      <p class="found-emoji" aria-hidden="true">🎉</p>
+      <h2 class="found-title">RESULT DECLARED</h2>
+      <p class="found-text" id="matchedText"></p>
+      <p class="found-time" id="foundAt"></p>
+      <p id="soundHint" class="found-hint" hidden>Tap anywhere on the screen to start the alarm sound.</p>
+      <button id="stopAlarmBtn" class="btn stop" type="button" hidden>Stop alarm</button>
+      <a class="btn open" href="https://results.nios.ac.in/" target="_blank" rel="noopener">Open NIOS results</a>
+    </section>
+
+    <p id="msg" class="msg" role="status" aria-live="polite"></p>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
