@@ -223,19 +223,40 @@
     Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), ms))]);
 
   // Describe an info object WITHOUT revealing its values (tokens stay private).
-  function describe(info) {
+  function describe(info, depth = 0) {
     if (info === null || info === undefined) return String(info);
     if (typeof info !== 'object') return typeof info;
-    return Object.keys(info).slice(0, 10).map((k) => {
+    return Object.keys(info).slice(0, 12).map((k) => {
       const v = info[k];
-      return typeof v === 'string' ? `${k}=text(${v.length})` : `${k}=${String(v)}`;
+      if (typeof v === 'string') return `${k}=text(${v.length})`;
+      if (v && typeof v === 'object' && depth < 1) return `${k}={${describe(v, depth + 1)}}`;
+      return `${k}=${String(v)}`;
     }).join(', ') || 'empty object';
   }
 
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  // Median's OneSignal SDK v5 bridge nests the device under `subscription`
+  // ({ id, token, optedIn }); the older bridge used top-level oneSignalUserId /
+  // oneSignalSubscribed. Both shapes are understood.
   function readInfo(info) {
     if (!info || typeof info !== 'object') return null;
-    const id = String(info.oneSignalUserId || info.subscriptionId || info.pushSubscriptionId || info.playerId || '');
-    const subscribed = !!(info.oneSignalSubscribed ?? info.subscribed);
+    const sub = info.subscription && typeof info.subscription === 'object' ? info.subscription : {};
+    const candidates = [
+      info.oneSignalUserId, info.subscriptionId, info.pushSubscriptionId, info.playerId,
+      sub.id, sub.subscriptionId, sub.pushSubscriptionId, sub.userId, sub.playerId,
+    ];
+    let id = candidates.map((v) => (typeof v === 'string' ? v.trim() : '')).find((v) => UUID.test(v)) || '';
+    if (!id) {
+      for (const v of Object.values(sub)) {
+        if (typeof v === 'string' && UUID.test(v.trim())) { id = v.trim(); break; }
+      }
+    }
+    const flags = [
+      info.oneSignalSubscribed, info.subscribed,
+      sub.optedIn, sub.subscribed, sub.isSubscribed, sub.enabled,
+    ].filter((v) => typeof v === 'boolean');
+    const subscribed = flags.length ? flags.some(Boolean) : !!id; // no flag at all: the test notification will tell
     return { id, subscribed, raw: info };
   }
 
