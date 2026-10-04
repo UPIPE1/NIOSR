@@ -4,11 +4,13 @@
   const $ = (id) => document.getElementById(id);
   const CFG = self.NIOS_CONFIG || {};
   const KEY_ALARM = 'nios.alarm';          // "off" when the user disabled the alarm
-  const KEY_ACK = 'nios.alarmStoppedFor';  // found_at value the user already stopped
+  const KEY_ACK = 'nios.alarmStoppedFor';  // detected_at value the user already stopped
   const POLL_MS = 60_000;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   let status = null;
   let vapidKey = '';
+  let nativeServerReady = true;
   let audioCtx = null;
   let alarmTimer = null;
   let alarmHigh = false;
@@ -24,18 +26,12 @@
     if (text) msgTimer = setTimeout(() => (el.textContent = ''), 7000);
   }
 
-  function fmtTime(iso) {
-    return new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-  }
-
-  function fmtAgo(iso) {
-    const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins} min ago`;
-    const h = Math.round(mins / 60);
-    if (h < 24) return `${h} h ago`;
-    return `${Math.round(h / 24)} d ago`;
-  }
+  // Exact date + time, always in India time so it matches the notifications.
+  const IST = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
+  });
+  const fmtIST = (iso) => `${IST.format(new Date(iso))} IST`;
 
   async function api(action, extra = {}) {
     if (!CFG.FUNCTION_URL || CFG.FUNCTION_URL.includes('YOUR-PROJECT-REF')) {
@@ -71,29 +67,35 @@
   /* -------------------------------------------------------------- render -- */
   function render() {
     if (!status) return;
-    const found = status.status === 'FOUND';
+    const found = status.result_found === true;
     document.body.classList.toggle('is-found', found);
     $('waitingView').hidden = found;
     $('foundView').hidden = !found;
 
+    // "Last checked" is the last SUCCESSFUL check. A failed attempt never changes it
+    // or the result status; it only adds the Check Failed notice.
+    const lastOk = status.last_successful_check ? fmtIST(status.last_successful_check) : 'Not checked yet';
+    const statusText = found ? '🟢 RESULT DECLARED' : '🟡 Not Declared Yet';
+
+    $('latestStatus').textContent = statusText;
+    $('lastChecked').textContent = lastOk;
+    $('foundStatus').textContent = statusText;
+    $('foundLastChecked').textContent = lastOk;
+
     if (found) {
       $('matchedText').textContent = status.matched_text || 'The announcement you were waiting for is live.';
-      $('foundAt').textContent = status.found_at ? `Detected ${fmtTime(status.found_at)}` : '';
-    } else {
-      $('lastChecked').textContent = status.last_checked_at
-        ? `${fmtTime(status.last_checked_at)} (${fmtAgo(status.last_checked_at)})`
-        : 'Not checked yet';
+      $('foundAt').textContent = status.detected_at ? `Detected ${fmtIST(status.detected_at)}` : '';
+    }
 
-      const warn = $('checkWarning');
-      if (status.last_check_ok === false) {
-        warn.hidden = false;
-        warn.textContent =
-          'The last check could not read the NIOS site' +
-          (status.last_error ? ` (${status.last_error})` : '') +
-          '. This is not a result; the next check will try again.';
-      } else {
-        warn.hidden = true;
-      }
+    const warn = $('checkWarning');
+    if (!found && status.last_check_ok === false) {
+      warn.hidden = false;
+      $('checkWarningText').textContent =
+        `The attempt at ${status.last_checked ? fmtIST(status.last_checked) : 'the last check'} could not read the NIOS site` +
+        (status.last_error ? ` (${status.last_error})` : '') +
+        '. The status above is from the last successful check. This is not a result.';
+    } else {
+      warn.hidden = true;
     }
     syncAlarm();
   }
@@ -103,9 +105,13 @@
       const data = await api('status');
       status = data.status;
       if (data.vapidPublicKey) vapidKey = data.vapidPublicKey;
+      nativeServerReady = data.nativePushAvailable !== false;
       render();
     } catch (e) {
-      if (!status) $('lastChecked').textContent = 'Could not load';
+      if (!status) {
+        $('latestStatus').textContent = 'Could not load';
+        $('lastChecked').textContent = 'Could not load';
+      }
       say(e.message, true);
     }
   }
@@ -113,7 +119,8 @@
   /* --------------------------------------------------------------- alarm -- */
   const alarmEnabled = () => localStorage.getItem(KEY_ALARM) !== 'off';
   const alarmNeeded = () =>
-    !!status && status.status === 'FOUND' && alarmEnabled() && localStorage.getItem(KEY_ACK) !== String(status.found_at);
+    !!status && status.result_found === true && alarmEnabled() &&
+    localStorage.getItem(KEY_ACK) !== String(status.detected_at);
 
   function ensureAudio() {
     try {
@@ -177,7 +184,63 @@
     $('alarmBtn').setAttribute('aria-pressed', String(on));
   }
 
-  /* ---------------------------------------------------------------- push -- */
+  /* --------------------------------------- native app (Median + OneSignal) -- */
+  // Inside a Median app there is no browser Web Push. Median bridges to the
+  // OneSignal SDK instead, and the server sends through OneSignal.
+  const nativeBridge = () => {
+    const m = self.median || self.gonative;
+    return m && m.onesignal ? m : null;
+  };
+  const isNativeApp = () => !!nativeBridge() || /\b(median|gonative)\b/i.test(navigator.userAgent);
+
+  async function waitForBridge(ms) {
+    const end = Date.now() + ms;
+    while (!nativeBridge() && Date.now() < end) await sleep(150);
+    return nativeBridge();
+  }
+
+  async function nativeInfo() {
+    const b = nativeBridge();
+    if (!b) return null;
+    const os = b.onesignal;
+    const getter = os.onesignalInfo || os.info;
+    if (typeof getter !== 'function') return null;
+    const info = await getter.call(os);
+    return {
+      id: String((info && (info.oneSignalUserId || info.subscriptionId)) || ''),
+      subscribed: !!(info && info.oneSignalSubscribed),
+    };
+  }
+
+  async function registerNative() {
+    const b = await waitForBridge(4000);
+    if (!b) {
+      throw new Error('The native push plugin is not available. Enable OneSignal in Median, then rebuild the app.');
+    }
+    try {
+      if (typeof b.onesignal.register === 'function') await b.onesignal.register(); // asks for permission
+    } catch { /* already registered / prompt unavailable */ }
+
+    let info = null;
+    for (let i = 0; i < 20; i++) {          // wait up to ~10 s for the permission prompt + registration
+      info = await nativeInfo().catch(() => null);
+      if (info && info.id && info.subscribed) break;
+      await sleep(500);
+    }
+    if (!info || !info.id) {
+      throw new Error('This app is not registered with OneSignal yet. Check the OneSignal App ID in Median and rebuild the app.');
+    }
+    if (!info.subscribed) {
+      throw new Error('Notifications are off for this app. Allow them in Android Settings > Apps > this app > Notifications.');
+    }
+    if (!nativeServerReady) {
+      throw new Error('The server has no OneSignal keys yet. Add ONESIGNAL_APP_ID and ONESIGNAL_API_KEY in Supabase.');
+    }
+    await api('subscribe_native', { subscription_id: info.id });
+    return info;
+  }
+
+  /* ----------------------------------------------------------- web push -- */
   const pushSupported = () =>
     'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
@@ -205,9 +268,23 @@
     return sub;
   }
 
+  /* ------------------------------------------------------------ push UI -- */
   async function updatePushUI() {
     const btn = $('pushBtn');
     const note = $('pushNote');
+
+    if (isNativeApp()) {
+      const info = await nativeInfo().catch(() => null);
+      if (info && info.id && info.subscribed) {
+        btn.hidden = true;
+        note.textContent = 'On for this device. You will be notified even when the app is closed.';
+      } else {
+        btn.hidden = false;
+        note.textContent = 'Allow notifications for this app to get alerts when it is closed.';
+      }
+      return;
+    }
+
     if (!pushSupported()) {
       btn.hidden = true;
       note.textContent = 'This browser cannot receive push notifications. On iPhone, add the app to your Home Screen first.';
@@ -233,12 +310,17 @@
     const btn = $('pushBtn');
     btn.disabled = true;
     try {
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') {
-        say('Notifications were not allowed.', true);
-      } else {
-        await subscribePush();
+      if (isNativeApp()) {
+        await registerNative();
         say('Notifications are on for this device.');
+      } else {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') {
+          say('Notifications were not allowed.', true);
+        } else {
+          await subscribePush();
+          say('Notifications are on for this device.');
+        }
       }
     } catch (e) {
       say(e.message, true);
@@ -252,11 +334,18 @@
     const btn = $('testBtn');
     btn.disabled = true;
     try {
-      if (!pushSupported() || Notification.permission !== 'granted') {
-        throw new Error('Turn on phone alerts first.');
+      if (isNativeApp()) {
+        let info = await nativeInfo().catch(() => null);
+        if (!info || !info.id || !info.subscribed) throw new Error('Turn on phone alerts first.');
+        await api('subscribe_native', { subscription_id: info.id }); // make sure the server knows this device
+        await api('test', { native_id: info.id });
+      } else {
+        if (!pushSupported() || Notification.permission !== 'granted') {
+          throw new Error('Turn on phone alerts first.');
+        }
+        const sub = (await currentSub()) || (await subscribePush());
+        await api('test', { endpoint: sub.endpoint });
       }
-      const sub = (await currentSub()) || (await subscribePush());
-      await api('test', { endpoint: sub.endpoint });
       say('Test sent. It should arrive in a few seconds.');
     } catch (e) {
       say(e.message, true);
@@ -275,8 +364,8 @@
       status = r.status;
       render();
       if (r.throttled) say(`Checked a moment ago. Try again in ${r.retry_after_min} min.`);
-      else if (r.ok === false) say('Could not read the NIOS site. Still waiting.', true);
-      else if (status.status !== 'FOUND') say('Checked. Not declared yet.');
+      else if (r.ok === false) say('Check Failed. Still showing the previous status.', true);
+      else if (!status.result_found) say('Checked. Not declared yet.');
     } catch (e) {
       say(e.message, true);
     } finally {
@@ -305,7 +394,7 @@
     });
 
     $('stopAlarmBtn').addEventListener('click', () => {
-      if (status && status.found_at) localStorage.setItem(KEY_ACK, String(status.found_at));
+      if (status && status.detected_at) localStorage.setItem(KEY_ACK, String(status.detected_at));
       syncAlarm();
     });
 
@@ -347,11 +436,20 @@
       }
     }
 
+    // The Median bridge can arrive a moment after the page loads.
+    if (isNativeApp()) await waitForBridge(4000);
+
     await refresh();
     await updatePushUI();
 
-    // Keep the server's copy of this device's subscription fresh.
-    if (pushSupported() && Notification.permission === 'granted') {
+    // Keep the server's copy of this device's registration fresh.
+    if (isNativeApp()) {
+      nativeInfo().then((info) => {
+        if (info && info.id && info.subscribed && nativeServerReady) {
+          return api('subscribe_native', { subscription_id: info.id });
+        }
+      }).catch(() => {});
+    } else if (pushSupported() && Notification.permission === 'granted') {
       subscribePush().then(updatePushUI).catch(() => {});
     }
   }

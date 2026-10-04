@@ -25,22 +25,30 @@
     <section id="waitingView" aria-live="polite">
       <div class="stamp" id="stamp">
         <span class="stamp-main">Not declared yet</span>
-        <span class="stamp-sub">checked every day</span>
+        <span class="stamp-sub">checked every 15 min</span>
       </div>
 
       <p class="lead">
-        Looking for an announcement that mentions
-        <strong>ODE</strong>, <strong>16 to 31 Aug 2026</strong>,
+        Checking <strong>results.nios.ac.in</strong> every 15 minutes, 7 AM to 10 PM IST, for one announcement
+        that mentions <strong>ODE</strong>, <strong>16 to 31 Aug 2026</strong>,
         <strong>Secondary</strong> and <strong>April 2026 Session</strong> together.
       </p>
 
       <dl class="facts">
         <div class="fact">
+          <dt>Latest status</dt>
+          <dd id="latestStatus">Loading…</dd>
+        </div>
+        <div class="fact">
           <dt>Last checked</dt>
           <dd id="lastChecked">Loading…</dd>
         </div>
       </dl>
-      <p id="checkWarning" class="warning" role="status" hidden></p>
+      <div id="checkWarning" class="warning" role="status" hidden>
+        <strong>Check Failed</strong>
+        <span id="checkWarningText"></span>
+      </div>
+      <p class="note">A daily status notification arrives at 12:00 PM IST.</p>
 
       <ul class="rows">
         <li class="row">
@@ -71,6 +79,16 @@
       <h2 class="found-title">RESULT DECLARED</h2>
       <p class="found-text" id="matchedText"></p>
       <p class="found-time" id="foundAt"></p>
+      <dl class="facts found-facts">
+        <div class="fact">
+          <dt>Latest status</dt>
+          <dd id="foundStatus">🟢 RESULT DECLARED</dd>
+        </div>
+        <div class="fact">
+          <dt>Last checked</dt>
+          <dd id="foundLastChecked">-</dd>
+        </div>
+      </dl>
       <p id="soundHint" class="found-hint" hidden>Tap anywhere on the screen to start the alarm sound.</p>
       <button id="stopAlarmBtn" class="btn stop" type="button" hidden>Stop alarm</button>
       <a class="btn open" href="https://results.nios.ac.in/" target="_blank" rel="noopener">Open NIOS results</a>
