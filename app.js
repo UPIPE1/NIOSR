@@ -187,11 +187,16 @@
   /* --------------------------------------- native app (Median + OneSignal) -- */
   // Inside a Median app there is no browser Web Push. Median bridges to the
   // OneSignal SDK instead, and the server sends through OneSignal.
+  const median = () => self.median || self.gonative || null;
   const nativeBridge = () => {
-    const m = self.median || self.gonative;
+    const m = median();
     return m && m.onesignal ? m : null;
   };
   const isNativeApp = () => !!nativeBridge() || /\b(median|gonative)\b/i.test(navigator.userAgent);
+
+  // Median also pushes the info to a global callback on page load; keep the latest copy.
+  let pushedInfo = null;
+  self.median_onesignal_info = (info) => { pushedInfo = info; };
 
   async function waitForBridge(ms) {
     const end = Date.now() + ms;
@@ -199,39 +204,97 @@
     return nativeBridge();
   }
 
+  // Median's bridge calls only work after median.onReady().
+  function whenMedianReady(ms) {
+    return new Promise((resolve) => {
+      const m = median();
+      let done = false;
+      const fin = () => { if (!done) { done = true; resolve(); } };
+      setTimeout(fin, ms);
+      if (m && typeof m.onReady === 'function') {
+        try { m.onReady(fin); } catch { fin(); }
+      } else {
+        fin();
+      }
+    });
+  }
+
+  const withTimeout = (p, ms) =>
+    Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), ms))]);
+
+  // Describe an info object WITHOUT revealing its values (tokens stay private).
+  function describe(info) {
+    if (info === null || info === undefined) return String(info);
+    if (typeof info !== 'object') return typeof info;
+    return Object.keys(info).slice(0, 10).map((k) => {
+      const v = info[k];
+      return typeof v === 'string' ? `${k}=text(${v.length})` : `${k}=${String(v)}`;
+    }).join(', ') || 'empty object';
+  }
+
+  function readInfo(info) {
+    if (!info || typeof info !== 'object') return null;
+    const id = String(info.oneSignalUserId || info.subscriptionId || info.pushSubscriptionId || info.playerId || '');
+    const subscribed = !!(info.oneSignalSubscribed ?? info.subscribed);
+    return { id, subscribed, raw: info };
+  }
+
+  // Returns { id, subscribed, raw } or null. Never throws; remembers why in lastNativeProblem.
+  let lastNativeProblem = '';
   async function nativeInfo() {
     const b = nativeBridge();
-    if (!b) return null;
+    if (!b) { lastNativeProblem = 'bridge missing'; return null; }
     const os = b.onesignal;
     const getter = os.onesignalInfo || os.info;
-    if (typeof getter !== 'function') return null;
-    const info = await getter.call(os);
-    return {
-      id: String((info && (info.oneSignalUserId || info.subscriptionId)) || ''),
-      subscribed: !!(info && info.oneSignalSubscribed),
-    };
+    if (typeof getter === 'function') {
+      try {
+        const info = await withTimeout(Promise.resolve(getter.call(os)), 4000);
+        const r = readInfo(info);
+        if (r) {
+          lastNativeProblem = r.id ? '' : `the info has no device ID (${describe(info)})`;
+          return r;
+        }
+        lastNativeProblem = `info call returned ${describe(info)}`;
+      } catch (e) {
+        lastNativeProblem = `info call failed (${e && e.message ? e.message : e})`;
+      }
+    } else {
+      lastNativeProblem = `no info method; bridge has: ${Object.keys(os).slice(0, 12).join(', ') || 'nothing'}`;
+    }
+    const pushed = readInfo(pushedInfo);   // fall back to the page-load callback
+    if (pushed) { lastNativeProblem = ''; return pushed; }
+    return null;
   }
 
   async function registerNative() {
     const b = await waitForBridge(4000);
     if (!b) {
-      throw new Error('The native push plugin is not available. Enable OneSignal in Median, then rebuild the app.');
+      throw new Error('The Median bridge is not available on this page. In Median, enable the JavaScript Bridge and make sure this site is an internal URL, then rebuild the app.');
     }
-    try {
-      if (typeof b.onesignal.register === 'function') await b.onesignal.register(); // asks for permission
-    } catch { /* already registered / prompt unavailable */ }
+    await whenMedianReady(3000);
+
+    // Ask for notification permission (the call name differs between Median versions).
+    const os = b.onesignal;
+    for (const name of ['register', 'requestPermission', 'promptForPushNotifications']) {
+      if (typeof os[name] === 'function') {
+        try { await withTimeout(Promise.resolve(os[name]()), 15000); } catch { /* prompt dismissed or unsupported */ }
+        break;
+      }
+    }
 
     let info = null;
-    for (let i = 0; i < 20; i++) {          // wait up to ~10 s for the permission prompt + registration
-      info = await nativeInfo().catch(() => null);
+    const deadline = Date.now() + 12000;    // wait up to ~12 s for the prompt + registration
+    while (Date.now() < deadline) {
+      info = await nativeInfo();
       if (info && info.id && info.subscribed) break;
       await sleep(500);
     }
     if (!info || !info.id) {
-      throw new Error('This app is not registered with OneSignal yet. Check the OneSignal App ID in Median and rebuild the app.');
+      throw new Error(`No OneSignal device ID yet. Median said: ${lastNativeProblem || 'no answer'}. ` +
+        'Check OneSignal > Audience > Subscriptions for this phone.');
     }
     if (!info.subscribed) {
-      throw new Error('Notifications are off for this app. Allow them in Android Settings > Apps > this app > Notifications.');
+      throw new Error('Notifications are off for this app. Allow them in Android Settings > Apps > this app > Notifications, then tap Turn on again.');
     }
     if (!nativeServerReady) {
       throw new Error('The server has no OneSignal keys yet. Add ONESIGNAL_APP_ID and ONESIGNAL_API_KEY in Supabase.');
@@ -437,7 +500,10 @@
     }
 
     // The Median bridge can arrive a moment after the page loads.
-    if (isNativeApp()) await waitForBridge(4000);
+    if (isNativeApp()) {
+      await waitForBridge(4000);
+      await whenMedianReady(3000);
+    }
 
     await refresh();
     await updatePushUI();
