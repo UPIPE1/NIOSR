@@ -1,12 +1,14 @@
 /* NIOS Result Watcher - service worker */
 try { importScripts('./config.js'); } catch (e) { /* config is only needed for pushsubscriptionchange */ }
 
-const CACHE = 'nios-watch-v2';
+const CACHE = 'nios-watch-v3';
 const SHELL = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './admin.html',
+  './admin.js',
   './config.js',
   './manifest.webmanifest',
   './icons/icon-192.png',

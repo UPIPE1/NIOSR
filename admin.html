@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Admin - NIOS Result Watcher</title>
+  <meta name="theme-color" content="#1B2A41">
+  <meta name="robots" content="noindex">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="admin">
+  <main class="shell">
+    <header class="top">
+      <h1>Admin</h1>
+      <a class="link-btn" href="./">Back to app</a>
+    </header>
+
+    <!-- Locked -->
+    <section id="lockedView">
+      <p class="lead">Enter the admin password to change which texts the watcher looks for.</p>
+      <label class="field-label" for="pw">Admin password</label>
+      <input id="pw" class="field" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false">
+      <button id="unlockBtn" class="btn primary wide" type="button">Unlock</button>
+    </section>
+
+    <!-- Unlocked -->
+    <section id="panelView" hidden>
+      <h2 class="h2">Texts to look for</h2>
+      <p class="help">
+        A result counts only when <strong>all</strong> of these appear together in the same announcement.
+        Capital letters and extra spaces do not matter. <em>Aug</em> also matches <em>August</em>,
+        and <em>to</em> also matches a dash.
+      </p>
+
+      <ol id="kwList" class="kw-list"></ol>
+      <div class="row-actions">
+        <button id="addBtn" class="btn small" type="button">Add text</button>
+        <button id="defaultsBtn" class="btn small" type="button">Restore original texts</button>
+      </div>
+      <p id="kwHint" class="hint" role="status"></p>
+
+      <label id="resetRow" class="check" hidden>
+        <input id="resetFound" type="checkbox" checked>
+        <span>The result was already found. Also start watching again with these texts.</span>
+      </label>
+
+      <div class="actions">
+        <button id="testBtn" class="btn" type="button">Test on the live NIOS page</button>
+        <button id="saveBtn" class="btn primary" type="button">Save texts</button>
+      </div>
+
+      <div id="testResult" class="result-box" role="status" aria-live="polite" hidden></div>
+
+      <div id="confirmBox" class="result-box warn" role="alert" hidden>
+        <strong>These texts already match the live page.</strong>
+        <span id="confirmText"></span>
+        <span>If you save, the alarm and notification will fire at the next check.</span>
+        <div class="row-actions">
+          <button id="confirmSave" class="btn small primary" type="button">Save anyway</button>
+          <button id="confirmCancel" class="btn small" type="button">Cancel</button>
+        </div>
+      </div>
+
+      <h2 class="h2">Status</h2>
+      <dl class="facts">
+        <div class="fact"><dt>Latest status</dt><dd id="adminStatus">-</dd></div>
+        <div class="fact"><dt>Texts set by</dt><dd id="adminSource">-</dd></div>
+      </dl>
+      <button id="rearmBtn" class="btn small" type="button" hidden>Reset found status</button>
+
+      <h2 class="h2">Recent checks</h2>
+      <ul id="checks" class="checks"></ul>
+
+      <button id="lockBtn" class="link-btn lock-link" type="button">Lock admin</button>
+    </section>
+
+    <p id="msg" class="msg" role="status" aria-live="polite"></p>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
