@@ -460,6 +460,22 @@
 
   /* ----------------------------------------------------------------- init -- */
   function wire() {
+    // Open the NIOS site from inside the app. In a Median app this uses its in-app browser
+    // (you stay in the app and can close it to come back); anywhere else it is a normal link.
+    document.querySelectorAll('a[data-nios-link]').forEach((a) => {
+      a.addEventListener('click', (e) => {
+        const m = median();
+        if (m && m.window && typeof m.window.open === 'function') {
+          e.preventDefault();
+          try {
+            m.window.open(a.href, 'appbrowser');
+          } catch {
+            window.open(a.href, '_blank', 'noopener');
+          }
+        }
+      });
+    });
+
     $('checkBtn').addEventListener('click', checkNow);
     $('testBtn').addEventListener('click', sendTest);
     $('pushBtn').addEventListener('click', enablePush);
