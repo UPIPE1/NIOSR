@@ -11,6 +11,7 @@
   let status = null;
   let vapidKey = '';
   let nativeServerReady = true;
+  let keywords = [];
   let audioCtx = null;
   let alarmTimer = null;
   let alarmHigh = false;
@@ -68,6 +69,7 @@
   function render() {
     if (!status) return;
     const found = status.result_found === true;
+    renderLead();
     document.body.classList.toggle('is-found', found);
     $('waitingView').hidden = found;
     $('foundView').hidden = !found;
@@ -100,12 +102,27 @@
     syncAlarm();
   }
 
+  // "...an announcement that mentions A, B and C together" built with textContent (no HTML injection).
+  function renderLead() {
+    const lead = $('lead');
+    if (!lead || !keywords.length) return;
+    lead.textContent = '';
+    const bold = (t) => { const b = document.createElement('strong'); b.textContent = t; return b; };
+    lead.append('Checking ', bold('results.nios.ac.in'), ' every 15 minutes, 7 AM to 10 PM IST, for one announcement that mentions ');
+    keywords.forEach((k, i) => {
+      if (i > 0) lead.append(i === keywords.length - 1 ? ' and ' : ', ');
+      lead.append(bold(k));
+    });
+    lead.append(' together.');
+  }
+
   async function refresh() {
     try {
       const data = await api('status');
       status = data.status;
       if (data.vapidPublicKey) vapidKey = data.vapidPublicKey;
       nativeServerReady = data.nativePushAvailable !== false;
+      if (Array.isArray(data.keywords)) keywords = data.keywords;
       render();
     } catch (e) {
       if (!status) {
