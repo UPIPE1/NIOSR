@@ -21,6 +21,18 @@
       <button id="installBtn" class="link-btn" type="button" hidden>Install app</button>
     </header>
 
+    <!-- Shown when NIOS adds new text to the announcement paragraph (until you dismiss it) -->
+    <section id="changeView" class="change" hidden aria-live="assertive">
+      <p class="change-emoji" aria-hidden="true">📢</p>
+      <h2 class="change-title">NEW ANNOUNCEMENT</h2>
+      <p class="change-lead">NIOS just added this to the result announcement:</p>
+      <div id="changeItems" class="change-items"></div>
+      <p id="changeTime" class="change-time"></p>
+      <p id="changeHint" class="found-hint" hidden>Tap anywhere on the screen to start the alarm sound.</p>
+      <button id="stopChangeBtn" class="btn stop" type="button">Stop alarm</button>
+      <a class="btn open" data-nios-link href="https://results.nios.ac.in/" target="_blank" rel="noopener">Open NIOS results</a>
+    </section>
+
     <!-- Shown while the result has not been declared -->
     <section id="waitingView" aria-live="polite">
       <div class="stamp" id="stamp">
@@ -43,6 +55,7 @@
           <dd id="lastChecked">Loading…</dd>
         </div>
       </dl>
+      <p id="watchLine" class="note" hidden>You also get an alarm whenever NIOS adds new text to the announcement paragraph.</p>
       <div id="checkWarning" class="warning" role="status" hidden>
         <strong>Check Failed</strong>
         <span id="checkWarningText"></span>

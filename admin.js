@@ -12,6 +12,8 @@
   let pendingConfirm = false;
   let msgTimer = null;
   let rearmTimer = null;
+  let baselineTimer = null;
+  let defaultAnchor = 'On Demand Examination Result';
 
   const IST = new Intl.DateTimeFormat('en-IN', {
     timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short',
@@ -140,6 +142,37 @@
     }
   }
 
+  function renderSeen(list) {
+    const ul = $('seenList');
+    ul.textContent = '';
+    if (!list || !list.length) {
+      const li = document.createElement('li');
+      li.className = 'chk-empty';
+      li.textContent = 'Nothing recorded yet. The next check records the paragraph.';
+      ul.append(li);
+      return;
+    }
+    for (const it of list) {
+      const li = document.createElement('li');
+      li.className = 'chk ok';
+      const text = document.createElement('span');
+      text.textContent = it.item_text;
+      const when = document.createElement('strong');
+      when.textContent = it.baseline ? 'Already there' : `New ${fmt(it.first_seen_at)}`;
+      li.append(text, when);
+      ul.append(li);
+    }
+  }
+
+  function renderWatch(data) {
+    const w = data.watch || {};
+    defaultAnchor = w.default_anchor || defaultAnchor;
+    $('watchOn').checked = w.enabled !== false;
+    $('anchor').value = w.anchor || defaultAnchor;
+    $('watchNote').textContent = (data.status && data.status.watch_note) || '';
+    renderSeen(data.seen_items);
+  }
+
   const SOURCE = { admin: 'This admin panel', env: 'Server setting (KEYWORDS)', default: 'Built-in defaults' };
 
   function enterPanel(data) {
@@ -151,6 +184,7 @@
     $('adminSource').textContent = SOURCE[data.source] || data.source;
     renderStatus();
     renderChecks(data.recent_checks);
+    renderWatch(data);
     onEdit();
   }
 
@@ -189,19 +223,35 @@
     btn.textContent = 'Testing…';
     $('confirmBox').hidden = true;
     try {
-      const r = await api('admin_test', { keywords: values() });
+      const anchor = $('anchor').value.trim() || defaultAnchor;
+      const r = await api('admin_test', { keywords: values(), watch_anchor: anchor });
       const box = $('testResult');
       box.hidden = false;
       box.className = 'result-box';
+      box.textContent = '';
+      const line = document.createElement('span');
+      box.append(line);
       if (!r.read_ok) {
         box.classList.add('warn');
-        box.textContent = `Could not read the NIOS site (${r.error}). Try again in a moment.`;
-      } else if (r.matched) {
-        box.classList.add('warn');
-        box.textContent = `These texts match the live page right now: "${r.matched}". Saving them will trigger the alarm at the next check.`;
+        line.textContent = `Could not read the NIOS site (${r.error}). Try again in a moment.`;
       } else {
-        box.classList.add('good');
-        box.textContent = 'No match on the live page right now. That is what you want before the result is out.';
+        if (r.matched) {
+          box.classList.add('warn');
+          line.textContent = `These texts match the live page right now: "${r.matched}". Saving them will trigger the alarm at the next check.`;
+        } else {
+          box.classList.add('good');
+          line.textContent = 'No match on the live page right now. That is what you want before the result is out.';
+        }
+        const info = document.createElement('span');
+        info.textContent = r.anchor_found
+          ? `The paragraph under "${anchor}" has ${r.items.length} item${r.items.length === 1 ? '' : 's'} right now:`
+          : `The heading "${anchor}" was not found on the page, so new announcements cannot be tracked.`;
+        box.append(info);
+        if (r.anchor_found && r.items.length) {
+          const ul = document.createElement('ul');
+          for (const t of r.items) { const li = document.createElement('li'); li.textContent = t; ul.append(li); }
+          box.append(ul);
+        }
       }
     } catch (e) {
       handleError(e);
@@ -242,6 +292,43 @@
     }
   }
 
+  async function saveWatch() {
+    const btn = $('saveWatchBtn');
+    btn.disabled = true;
+    try {
+      const r = await api('admin_save_watch', {
+        watch_changes: $('watchOn').checked,
+        watch_anchor: $('anchor').value.trim(),
+      });
+      $('anchor').value = r.watch.anchor;
+      say(r.watch.enabled ? 'Saved. New announcements will raise the alarm.' : 'Saved. New-announcement alerts are off.');
+    } catch (e) {
+      handleError(e);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function resetBaseline() {
+    const btn = $('baselineBtn');
+    if (btn.dataset.armed !== '1') {           // first tap asks for a second tap
+      btn.dataset.armed = '1';
+      btn.textContent = 'Tap again to confirm';
+      clearTimeout(baselineTimer);
+      baselineTimer = setTimeout(() => { btn.dataset.armed = ''; btn.textContent = 'Forget history (start fresh)'; }, 4000);
+      return;
+    }
+    btn.dataset.armed = '';
+    btn.textContent = 'Forget history (start fresh)';
+    try {
+      await api('admin_reset_baseline');
+      renderSeen([]);
+      say('History cleared. The next check records the paragraph again without an alert.');
+    } catch (e) {
+      handleError(e);
+    }
+  }
+
   async function rearm() {
     const btn = $('rearmBtn');
     if (btn.dataset.armed !== '1') {           // first tap asks for a second tap
@@ -279,6 +366,8 @@
     $('confirmSave').addEventListener('click', () => save(true));
     $('confirmCancel').addEventListener('click', hideResults);
     $('rearmBtn').addEventListener('click', rearm);
+    $('saveWatchBtn').addEventListener('click', saveWatch);
+    $('baselineBtn').addEventListener('click', resetBaseline);
     $('lockBtn').addEventListener('click', () => leavePanel('Locked.'));
   }
 

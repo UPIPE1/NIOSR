@@ -1,7 +1,7 @@
 /* NIOS Result Watcher - service worker */
 try { importScripts('./config.js'); } catch (e) { /* config is only needed for pushsubscriptionchange */ }
 
-const CACHE = 'nios-watch-v3';
+const CACHE = 'nios-watch-v4';
 const SHELL = [
   './',
   './index.html',
@@ -55,14 +55,15 @@ self.addEventListener('push', (event) => {
   }
   const found = data.type === 'found';
   const daily = data.type === 'daily';
+  const change = data.type === 'change';
 
   event.waitUntil((async () => {
     await self.registration.showNotification(data.title || 'NIOS Result Watcher', {
       body: data.body || '',
       icon: './icons/icon-192.png',
       tag: data.tag || (found ? 'nios-result' : daily ? 'nios-daily' : 'nios-test'), // same tag replaces, never stacks
-      requireInteraction: found,                  // the result alert stays on screen until tapped
-      vibrate: found ? [600, 200, 600, 200, 600, 200, 900] : daily ? [250, 120, 250] : [200],
+      requireInteraction: found || change,        // result / new-announcement alerts stay until tapped
+      vibrate: found ? [600, 200, 600, 200, 600, 200, 900] : change ? [500, 200, 500, 200, 500] : daily ? [250, 120, 250] : [200],
       data: { url: data.url || './' },
     });
     // If the app is open, tell it so it can refresh and start the alarm right away.

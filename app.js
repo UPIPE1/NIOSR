@@ -5,6 +5,7 @@
   const CFG = self.NIOS_CONFIG || {};
   const KEY_ALARM = 'nios.alarm';          // "off" when the user disabled the alarm
   const KEY_ACK = 'nios.alarmStoppedFor';  // detected_at value the user already stopped
+  const KEY_CHANGE_ACK = 'nios.changeSeenFor'; // change_alert_at value the user already dismissed
   const POLL_MS = 60_000;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -12,6 +13,7 @@
   let vapidKey = '';
   let nativeServerReady = true;
   let keywords = [];
+  let watching = true;
   let audioCtx = null;
   let alarmTimer = null;
   let alarmHigh = false;
@@ -69,10 +71,25 @@
   function render() {
     if (!status) return;
     const found = status.result_found === true;
+    const change = changeNeeded();
     renderLead();
-    document.body.classList.toggle('is-found', found);
-    $('waitingView').hidden = found;
-    $('foundView').hidden = !found;
+    document.body.classList.toggle('is-found', found && !change);
+    document.body.classList.toggle('is-change', change);
+    $('waitingView').hidden = found || change;
+    $('foundView').hidden = !found || change;
+    $('changeView').hidden = !change;
+    $('watchLine').hidden = !watching;
+
+    if (change) {
+      const box = $('changeItems');
+      box.textContent = '';
+      for (const t of String(status.change_alert_text || '').split(' | ').filter(Boolean)) {
+        const p = document.createElement('p');
+        p.textContent = t;
+        box.append(p);
+      }
+      $('changeTime').textContent = `Seen ${fmtIST(status.change_alert_at)}`;
+    }
 
     // "Last checked" is the last SUCCESSFUL check. A failed attempt never changes it
     // or the result status; it only adds the Check Failed notice.
@@ -123,6 +140,7 @@
       if (data.vapidPublicKey) vapidKey = data.vapidPublicKey;
       nativeServerReady = data.nativePushAvailable !== false;
       if (Array.isArray(data.keywords)) keywords = data.keywords;
+      if (data.watch) watching = data.watch.enabled !== false;
       render();
     } catch (e) {
       if (!status) {
@@ -135,9 +153,12 @@
 
   /* --------------------------------------------------------------- alarm -- */
   const alarmEnabled = () => localStorage.getItem(KEY_ALARM) !== 'off';
-  const alarmNeeded = () =>
+  const foundRinging = () =>
     !!status && status.result_found === true && alarmEnabled() &&
     localStorage.getItem(KEY_ACK) !== String(status.detected_at);
+  const changeNeeded = () =>
+    !!status && !!status.change_alert_at && localStorage.getItem(KEY_CHANGE_ACK) !== String(status.change_alert_at);
+  const changeRinging = () => changeNeeded() && alarmEnabled();
 
   function ensureAudio() {
     try {
@@ -175,6 +196,7 @@
     alarmHigh = !alarmHigh;
     const played = beep(alarmHigh ? 988 : 659, 0.4);
     $('soundHint').hidden = played;
+    $('changeHint').hidden = played;
     if (played) buzz(300);
   }
 
@@ -189,12 +211,12 @@
     alarmTimer = null;
     buzz(0);
     $('soundHint').hidden = true;
+    $('changeHint').hidden = true;
   }
 
   function syncAlarm() {
-    const ringing = alarmNeeded();
-    $('stopAlarmBtn').hidden = !ringing;
-    if (ringing) startAlarm(); else stopAlarmSound();
+    $('stopAlarmBtn').hidden = !foundRinging();
+    if (foundRinging() || changeRinging()) startAlarm(); else stopAlarmSound();
 
     const on = alarmEnabled();
     $('alarmBtn').textContent = on ? 'On' : 'Off';
@@ -508,6 +530,11 @@
         say('Alarm sound is off.');
       }
       syncAlarm();
+    });
+
+    $('stopChangeBtn').addEventListener('click', () => {
+      if (status && status.change_alert_at) localStorage.setItem(KEY_CHANGE_ACK, String(status.change_alert_at));
+      render();
     });
 
     $('stopAlarmBtn').addEventListener('click', () => {

@@ -29,7 +29,9 @@
     <section id="panelView" hidden>
       <h2 class="h2">Texts to look for</h2>
       <p class="help">
-        A result counts only when <strong>all</strong> of these appear on the same announcement line.
+        A result counts only when <strong>all</strong> of these appear in the same announcement <strong>item</strong>.
+        NIOS lists items in one paragraph separated by commas; the words at the start
+        (<em>ODE</em>) and the bracket at the end (<em>(April 2026 Session)</em>) count for every item.
         Capital letters and extra spaces do not matter. <em>Aug</em> also matches <em>August</em>,
         and <em>to</em> also matches a dash.
       </p>
@@ -66,6 +68,26 @@
           <button id="confirmCancel" class="btn small" type="button">Cancel</button>
         </div>
       </div>
+
+      <h2 class="h2">New announcements</h2>
+      <p class="help">
+        Independent of the texts above: you get an alarm and a notification every time NIOS adds a new item to the
+        announcement paragraph. The first check only records what is already there.
+      </p>
+      <label class="check">
+        <input id="watchOn" type="checkbox" checked>
+        <span>Alert me whenever new text is added to the announcement paragraph</span>
+      </label>
+      <label class="field-label" for="anchor">Heading the paragraph sits under</label>
+      <input id="anchor" class="field" type="text" maxlength="100" autocomplete="off" spellcheck="false">
+      <div class="actions">
+        <button id="saveWatchBtn" class="btn primary" type="button">Save</button>
+      </div>
+      <p id="watchNote" class="hint" role="status"></p>
+
+      <h3 class="h3">Announcement history</h3>
+      <ul id="seenList" class="checks"></ul>
+      <button id="baselineBtn" class="btn small" type="button">Forget history (start fresh)</button>
 
       <h2 class="h2">Status</h2>
       <dl class="facts">

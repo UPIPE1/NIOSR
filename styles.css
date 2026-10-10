@@ -330,3 +330,43 @@ body.is-found .msg { color: var(--ink); }
 .lock-link { display: block; margin: 1.5rem 0 0; }
 .foot { margin: 1.5rem 0 0; text-align: center; font-size: .9375rem; }
 .foot a { color: var(--muted); }
+
+
+/* -------------------------------------------------------- new announcement -- */
+body.is-change { background: var(--stamp); color: var(--paper); }
+body.is-change .link-btn { color: var(--paper); }
+body.is-change .msg { color: var(--paper); }
+
+.change { text-align: center; padding-top: 1.5rem; overflow-x: clip; }
+.change-emoji { margin: 0; font-size: 5rem; line-height: 1; }
+.change-title {
+  margin: 1rem 0 .5rem;
+  font-family: var(--serif);
+  font-size: clamp(2rem, 10vw, 3rem);
+  font-weight: 800;
+  line-height: 1.05;
+  animation: stamp-in .55s cubic-bezier(.2, .9, .3, 1.2) both;
+}
+.change-lead { margin: 0 0 1rem; }
+.change-items { display: grid; gap: .5rem; margin: 0 0 .75rem; text-align: left; }
+.change-items p {
+  margin: 0;
+  padding: .875rem 1rem;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: .5rem;
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  overflow-wrap: anywhere;
+}
+.change-time { margin: 0 0 1.25rem; font-size: .9375rem; }
+.change .btn { width: 100%; margin-bottom: .75rem; }
+.change .btn.stop { background: var(--brick); border-color: var(--brick); color: #fff; min-height: 3.75rem; font-size: 1.25rem; }
+.change .btn.open { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+
+.h3 { margin: 1.25rem 0 .5rem; font-size: 1rem; font-weight: 700; }
+.result-box ul { margin: 0; padding-left: 1.25rem; display: grid; gap: .25rem; }
+
+body.is-change .foot a { color: var(--paper); }
+body.is-found .foot a { color: var(--ink); }
